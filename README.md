@@ -1,25 +1,96 @@
-# go-musthave-diploma-tpl
+# Gophermart - Loyalty System
 
-Шаблон репозитория для индивидуального дипломного проекта курса «Go-разработчик»
+Накопительная система лояльности для интернет-магазина «Гофермарт».
 
-# Начало работы
+## Требования
 
-1. Склонируйте репозиторий в любую подходящую директорию на вашем компьютере.
-2. В корне репозитория выполните команду `go mod init <name>` (где `<name>` — адрес вашего репозитория на GitHub без
-   префикса `https://`) для создания модуля
+- Go 1.22+
+- PostgreSQL 15+
+- Docker & Docker Compose (опционально)
 
-# Обновление шаблона
+## Быстрый старт
 
-Чтобы иметь возможность получать обновления автотестов и других частей шаблона, выполните команду:
+### Локальный запуск
 
+1. Запустить PostgreSQL:
+```bash
+docker run -d --name postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=gophermart \
+  -p 5432:5432 \
+  postgres:15
 ```
-git remote add -m master template https://github.com/yandex-praktikum/go-musthave-diploma-tpl.git
+
+2. Запустить систему начисления:
+```bash
+cd cmd/accrual
+chmod +x accrual_linux_amd64
+RUN_ADDRESS="localhost:8081" \
+./accrual_linux_amd64
 ```
 
-Для обновления кода автотестов выполните команду:
-
+3. Запустить gophermart:
+```bash
+make run-flags
 ```
-git fetch template && git checkout template/master .github
+
+### Docker Compose
+```bash
+make docker-up
 ```
 
-Затем добавьте полученные изменения в свой репозиторий.
+## Конфигурация
+
+Сервис поддерживает конфигурирование через флаги и переменные окружения:
+
+| Параметр | Флаг | Environment | По умолчанию |
+|----------|------|-------------|--------------|
+| Адрес сервера | `-a` | `RUN_ADDRESS` | `localhost:8080` |
+| База данных | `-d` | `DATABASE_URI` | - |
+| Система начисления | `-r` | `ACCRUAL_SYSTEM_ADDRESS` | `http://localhost:8081` |
+
+## API Endpoints
+
+- `POST /api/user/register` - регистрация пользователя
+- `POST /api/user/login` - аутентификация пользователя
+- `POST /api/user/orders` - загрузка номера заказа
+- `GET /api/user/orders` - список заказов
+- `GET /api/user/balance` - текущий баланс
+- `POST /api/user/balance/withdraw` - списание баллов
+- `GET /api/user/withdrawals` - история списаний
+
+## Разработка
+
+### Сборка
+```bash
+make build
+```
+
+### Тесты
+```bash
+make test
+```
+
+### Покрытие тестами
+```bash
+make test-coverage
+```
+
+### Форматирование
+```bash
+make fmt
+```
+
+## Структура проекта
+```
+gophermart/
+├── cmd/gophermart/     # Entry point
+├── internal/           # Private application code
+│   ├── config/        # Configuration
+│   ├── storage/       # Database layer
+│   ├── handlers/      # HTTP handlers
+│   ├── auth/          # Authentication
+│   ├── models/        # Data models
+│   └── accrual/       # Accrual client
+├── migrations/        # Database migrations
+```
