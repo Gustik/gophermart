@@ -81,6 +81,46 @@ make test-coverage
 make fmt
 ```
 
+## Миграции базы данных
+
+Проект использует [golang-migrate](https://github.com/golang-migrate/migrate) для управления миграциями.
+
+### Автоматическое применение
+
+Миграции применяются автоматически при старте приложения.
+
+### Ручное управление (опционально)
+
+Установите CLI инструмент:
+```bash
+# macOS
+brew install golang-migrate
+
+# Linux
+curl -L https://github.com/golang-migrate/migrate/releases/download/v4.17.0/migrate.linux-amd64.tar.gz | tar xvz
+sudo mv migrate /usr/local/bin/
+```
+
+Применение миграций:
+```bash
+# Применить все миграции
+make migrate-up
+
+# Откатить последнюю миграцию
+make migrate-down
+
+# Создать новую миграцию
+make migrate-create
+# Введите название, например: add_indexes
+```
+
+### Структура миграций
+```
+migrations/
+├── 000001_init_schema.up.sql    # Применение миграции
+└── 000001_init_schema.down.sql  # Откат миграции
+```
+
 ## Структура проекта
 ```
 gophermart/

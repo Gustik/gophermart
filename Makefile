@@ -1,85 +1,85 @@
-.PHONY: build run test clean docker-up docker-down
+.PHONY: build run test clean docker-up docker-down migrate-up migrate-down
 
-# Go parameters
+# Параметры Go
 GOCMD=go
 GOBUILD=$(GOCMD) build
 GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
-GOMOD=$(GOCMD) mod
-
-# Binary name
+GOMIGRATECMD=~/go/bin/migrate
 BINARY_NAME=gophermart
 BINARY_PATH=cmd/gophermart
 
-# Build the project
+# Параметры БД
+DB_URI=postgresql://postgres:postgres@localhost:5432/gophermart?sslmode=disable
+
+# Сборка проекта
 build:
 	cd $(BINARY_PATH) && $(GOBUILD) -o $(BINARY_NAME) -v
 
-# Run the project locally
+# Запуск локально
 run: build
 	cd $(BINARY_PATH) && ./$(BINARY_NAME)
 
-# Run with flags
+# Запуск с флагами
 run-flags:
 	$(GOCMD) run $(BINARY_PATH)/main.go \
 		-a "localhost:8080" \
-		-d "postgresql://postgres:postgres@localhost:5432/praktikum?sslmode=disable" \
+		-d "$(DB_URI)" \
 		-r "http://localhost:8081"
 
-# Run tests
+# Запуск тестов
 test:
 	$(GOTEST) -v -cover ./...
 
-# Test coverage
+# Покрытие тестами
 test-coverage:
 	$(GOTEST) -v -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report: coverage.html"
+	@echo "Отчёт о покрытии: coverage.html"
 
-# Clean build files
+# Очистка
 clean:
 	rm -f $(BINARY_PATH)/$(BINARY_NAME)
 	rm -f coverage.out coverage.html
 
-# Tidy dependencies
+# Обновление зависимостей
 tidy:
-	$(GOMOD) tidy
+	go mod tidy
 
-# Docker compose up
+# Docker Compose
 docker-up:
 	docker-compose up --build
 
-# Docker compose down
 docker-down:
 	docker-compose down -v
 
-# Database migration (placeholder)
+# Миграции (через golang-migrate CLI, если установлен)
 migrate-up:
-	@echo "Running migrations..."
-	# TODO: add migration tool
+	$(GOMIGRATECMD) -path migrations -database "$(DB_URI)" up
 
 migrate-down:
-	@echo "Rolling back migrations..."
-	# TODO: add migration tool
+	$(GOMIGRATECMD) -path migrations -database "$(DB_URI)" down
 
-# Format code
+# Создать новую миграцию
+migrate-create:
+	@read -p "Название миграции: " name; \
+	$(GOMIGRATECMD) create -ext sql -dir migrations -seq $$name
+
+# Форматирование кода
 fmt:
 	$(GOCMD) fmt ./...
 
-# Lint code (requires golangci-lint)
-lint:
-	golangci-lint run
-
-# Help
+# Справка
 help:
-	@echo "Available targets:"
-	@echo "  build         - Build the binary"
-	@echo "  run           - Build and run locally"
-	@echo "  run-flags     - Run with example flags"
-	@echo "  test          - Run tests"
-	@echo "  test-coverage - Run tests with coverage"
-	@echo "  clean         - Clean build artifacts"
-	@echo "  docker-up     - Start with docker-compose"
-	@echo "  docker-down   - Stop docker-compose"
-	@echo "  fmt           - Format code"
-	@echo "  lint          - Lint code"
+	@echo "Доступные команды:"
+	@echo "  build          - Собрать бинарник"
+	@echo "  run            - Собрать и запустить"
+	@echo "  run-flags      - Запустить с примерами флагов"
+	@echo "  test           - Запустить тесты"
+	@echo "  test-coverage  - Тесты с покрытием"
+	@echo "  clean          - Очистить артефакты сборки"
+	@echo "  docker-up      - Запустить через docker-compose"
+	@echo "  docker-down    - Остановить docker-compose"
+	@echo "  migrate-up     - Применить миграции"
+	@echo "  migrate-down   - Откатить миграции"
+	@echo "  migrate-create - Создать новую миграцию"
+	@echo "  fmt            - Форматировать код"
