@@ -47,10 +47,13 @@ tidy:
 
 # Docker Compose
 docker-up:
-	docker-compose up --build
+	docker compose up --build
+
+docker-up-service:
+	docker compose up postgres accrual -d
 
 docker-down:
-	docker-compose down -v
+	docker compose down -v
 
 # Миграции (через golang-migrate CLI, если установлен)
 migrate-up:

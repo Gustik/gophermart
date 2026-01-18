@@ -25,10 +25,10 @@ services:
     volumes:
       - ./cmd/accrual:/app
     environment:
-      RUN_ADDRESS: "0.0.0.0:8080"
+      RUN_ADDRESS: "0.0.0.0:8071"
     command: /app/accrual_linux_amd64
     ports:
-      - "8081:8080"
+      - "8071:8071"
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,11 +39,11 @@ services:
       dockerfile: Dockerfile
     container_name: gophermart-app
     environment:
-      RUN_ADDRESS: "0.0.0.0:8080"
+      RUN_ADDRESS: "0.0.0.0:8070"
       DATABASE_URI: "postgresql://postgres:postgres@postgres:5432/gophermart?sslmode=disable"
-      ACCRUAL_SYSTEM_ADDRESS: "http://accrual:8080"
+      ACCRUAL_SYSTEM_ADDRESS: "http://accrual:8071"
     ports:
-      - "8080:8080"
+      - "8070:8070"
     depends_on:
       postgres:
         condition: service_healthy
