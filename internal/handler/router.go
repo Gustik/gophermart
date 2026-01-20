@@ -12,15 +12,17 @@ import (
 )
 
 type Router struct {
-	jwtSecret   string
-	logger      *zap.Logger
-	authHandler *AuthHandler
+	jwtSecret    string
+	logger       *zap.Logger
+	authHandler  *AuthHandler
+	orderHandler *OrderHandler
 }
 
-func NewRouter(jwtSecret string, logger *zap.Logger, authService *service.AuthService) *Router {
+func NewRouter(jwtSecret string, logger *zap.Logger, authService *service.AuthService, orderService *service.OrderService) *Router {
 	return &Router{
-		jwtSecret:   jwtSecret,
-		authHandler: NewAuthHandler(logger, authService),
+		jwtSecret:    jwtSecret,
+		authHandler:  NewAuthHandler(logger, authService),
+		orderHandler: NewOrderHandler(logger, orderService),
 	}
 }
 
@@ -31,13 +33,21 @@ func (rt *Router) Setup() http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 
-	r.Post("/api/user/register", rt.authHandler.Register)
-	r.Post("/api/user/login", rt.authHandler.Login)
+	// Публичные роуты
+	r.Group(func(r chi.Router) {
+		r.Use(myMiddleware.RequireContentType("application/json"))
 
-	// Защищённые
+		r.Post("/api/user/register", rt.authHandler.Register)
+		r.Post("/api/user/login", rt.authHandler.Login)
+	})
+
+	// Защищённые роуты
 	r.Group(func(r chi.Router) {
 		r.Use(myMiddleware.AuthMiddleware(rt.jwtSecret))
+
 		r.Get("/api/user/check", rt.authHandler.Check)
+		r.With(myMiddleware.RequireContentType("text/plain")).
+			Post("/api/user/orders", rt.orderHandler.UploadOrder)
 	})
 
 	return r

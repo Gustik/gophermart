@@ -9,8 +9,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Ключ для хранения user_id в контексте
-const userIDKey string = "user_id"
+// contextKey - тип для ключей контекста
+type contextKey string
+
+const userIDKey contextKey = "user_id"
 
 var (
 	// ErrInvalidToken - невалидный токен

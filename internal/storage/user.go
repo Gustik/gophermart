@@ -5,18 +5,18 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/Gustik/gophermart/internal/models"
+	"github.com/Gustik/gophermart/internal/model"
 )
 
 // CreateUser создаёт нового пользователя в БД
-func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (*models.User, error) {
+func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (*model.User, error) {
 	query := `
 		INSERT INTO users (login, password_hash)
 		VALUES ($1, $2)
 		RETURNING id, login, created_at
 	`
 
-	var user models.User
+	var user model.User
 	err := s.db.QueryRowContext(ctx, query, login, passwordHash).Scan(
 		&user.ID,
 		&user.Login,
@@ -30,14 +30,14 @@ func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (*
 }
 
 // GetUserByLogin получает пользователя по логину
-func (s *Storage) GetUserByLogin(ctx context.Context, login string) (*models.User, error) {
+func (s *Storage) GetUserByLogin(ctx context.Context, login string) (*model.User, error) {
 	query := `
 		SELECT id, login, password_hash, created_at
 		FROM users
 		WHERE login = $1
 	`
 
-	var user models.User
+	var user model.User
 	err := s.db.QueryRowContext(ctx, query, login).Scan(
 		&user.ID,
 		&user.Login,

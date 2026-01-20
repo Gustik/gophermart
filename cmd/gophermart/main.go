@@ -47,7 +47,8 @@ func main() {
 	}
 
 	authService := service.NewAuthService(cfg.JWTSecret, store)
-	router := handler.NewRouter(cfg.JWTSecret, logger, authService)
+	orderService := service.NewOrderService(store)
+	router := handler.NewRouter(cfg.JWTSecret, logger, authService, orderService)
 
 	// Создание HTTP сервера
 	server := &http.Server{
