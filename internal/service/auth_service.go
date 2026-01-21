@@ -16,22 +16,28 @@ var (
 	ErrInvalidCredentials = errors.New("неверный логин или пароль")
 )
 
-// AuthService предоставляет бизнес-логику для аутентификации
-type AuthService struct {
+// AuthService определяет методы для сервиса аутентификации
+type AuthService interface {
+	Register(ctx context.Context, login, password string) (string, error)
+	Login(ctx context.Context, login, password string) (string, error)
+}
+
+// authService предоставляет бизнес-логику для аутентификации
+type authService struct {
 	jwtSecret string
 	storage   *storage.Storage
 }
 
 // NewAuthService создаёт новый AuthService
-func NewAuthService(jwtSecret string, storage *storage.Storage) *AuthService {
-	return &AuthService{
+func NewAuthService(jwtSecret string, storage *storage.Storage) AuthService {
+	return &authService{
 		jwtSecret: jwtSecret,
 		storage:   storage,
 	}
 }
 
 // Register регистрирует нового пользователя
-func (s *AuthService) Register(ctx context.Context, login, password string) (string, error) {
+func (s *authService) Register(ctx context.Context, login, password string) (string, error) {
 	// Проверяем, существует ли пользователь
 	existingUser, err := s.storage.GetUserByLogin(ctx, login)
 	if err != nil {
@@ -68,7 +74,7 @@ func (s *AuthService) Register(ctx context.Context, login, password string) (str
 }
 
 // Login аутентифицирует пользователя
-func (s *AuthService) Login(ctx context.Context, login, password string) (string, error) {
+func (s *authService) Login(ctx context.Context, login, password string) (string, error) {
 	// Получаем пользователя из БД
 	user, err := s.storage.GetUserByLogin(ctx, login)
 	if err != nil {

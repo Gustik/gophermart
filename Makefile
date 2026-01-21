@@ -35,6 +35,7 @@ test-coverage:
 	$(GOTEST) -v -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Отчёт о покрытии: coverage.html"
+	@echo "Общее покрытие: $$($(GOCMD) tool cover -func=coverage.out | grep total | awk '{print $$3}')"
 
 # Очистка
 clean:

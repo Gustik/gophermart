@@ -14,11 +14,11 @@ import (
 
 type OrderHandler struct {
 	logger       *zap.Logger
-	orderService *service.OrderService
+	orderService service.OrderService
 }
 
 // NewOrderHandler создает новый OrderHandler
-func NewOrderHandler(logger *zap.Logger, orderService *service.OrderService) *OrderHandler {
+func NewOrderHandler(logger *zap.Logger, orderService service.OrderService) *OrderHandler {
 	return &OrderHandler{
 		logger:       logger,
 		orderService: orderService,

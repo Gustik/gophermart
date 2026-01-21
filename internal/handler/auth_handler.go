@@ -14,11 +14,11 @@ import (
 // AuthHandler обрабатывает запросы аутентификации
 type AuthHandler struct {
 	logger      *zap.Logger
-	authService *service.AuthService
+	authService service.AuthService
 }
 
 // NewAuthHandler создаёт новый AuthHandler
-func NewAuthHandler(logger *zap.Logger, authService *service.AuthService) *AuthHandler {
+func NewAuthHandler(logger *zap.Logger, authService service.AuthService) *AuthHandler {
 	return &AuthHandler{
 		logger:      logger,
 		authService: authService,

@@ -18,7 +18,7 @@ type Router struct {
 	orderHandler *OrderHandler
 }
 
-func NewRouter(jwtSecret string, logger *zap.Logger, authService *service.AuthService, orderService *service.OrderService) *Router {
+func NewRouter(jwtSecret string, logger *zap.Logger, authService service.AuthService, orderService service.OrderService) *Router {
 	return &Router{
 		jwtSecret:    jwtSecret,
 		authHandler:  NewAuthHandler(logger, authService),
