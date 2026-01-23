@@ -18,11 +18,11 @@ const (
 
 // Order представляет заказ пользователя
 type Order struct {
-	ID         int         `json:"id"`
-	UserID     int         `json:"user_id"`
-	Number     string      `json:"number"`
-	Status     OrderStatus `json:"status"`
-	Accrual    *float32    `json:"accrual,omitempty"`
-	UploadedAt time.Time   `json:"uploaded_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
+	ID         int         `json:"id" db:"id"`
+	UserID     int         `json:"user_id" db:"user_id"`
+	Number     string      `json:"number" db:"number"`
+	Status     OrderStatus `json:"status" db:"status"`
+	Accrual    *float32    `json:"accrual,omitempty" db:"accrual"`
+	UploadedAt time.Time   `json:"uploaded_at" db:"uploaded_at"`
+	UpdatedAt  time.Time   `json:"updated_at" db:"updated_at"`
 }

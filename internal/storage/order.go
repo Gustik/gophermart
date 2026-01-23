@@ -5,25 +5,25 @@ import (
 	"database/sql"
 	"fmt"
 
+	sq "github.com/Masterminds/squirrel"
+
 	"github.com/Gustik/gophermart/internal/model"
 )
 
 // GetOrderByNumber возвращает заказ по номеру
 func (s *Storage) GetOrderByNumber(ctx context.Context, number string) (*model.Order, error) {
-	query := `
-		SELECT id, user_id, number, status, accrual
-		FROM orders
-		WHERE number = $1
-	`
+	query, args, err := s.psql.
+		Select("id", "user_id", "number", "status", "accrual").
+		From("orders").
+		Where(sq.Eq{"number": number}).
+		ToSql()
+
+	if err != nil {
+		return nil, fmt.Errorf("не удалось построить запрос: %w", err)
+	}
 
 	var order model.Order
-	err := s.db.QueryRowContext(ctx, query, number).Scan(
-		&order.ID,
-		&order.UserID,
-		&order.Number,
-		&order.Status,
-		&order.Accrual,
-	)
+	err = s.db.GetContext(ctx, &order, query, args...)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -36,12 +36,17 @@ func (s *Storage) GetOrderByNumber(ctx context.Context, number string) (*model.O
 
 // CreateOrder создает запись номера заказа
 func (s *Storage) CreateOrder(ctx context.Context, userID int, number string) error {
-	query := `
-        INSERT INTO orders (user_id, number, status)
-        VALUES ($1, $2, $3)
-    `
+	query, args, err := s.psql.
+		Insert("orders").
+		Columns("user_id", "number", "status").
+		Values(userID, number, model.OrderStatusNew).
+		ToSql()
 
-	_, err := s.db.ExecContext(ctx, query, userID, number, model.OrderStatusNew)
+	if err != nil {
+		return fmt.Errorf("не удалось построить запрос: %w", err)
+	}
+
+	_, err = s.db.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("ошибка создания записи номера заказа: %w", err)
 	}

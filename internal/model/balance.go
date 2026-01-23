@@ -12,9 +12,9 @@ type Balance struct {
 
 // Withdrawal представляет операцию списания баллов
 type Withdrawal struct {
-	ID          int       `json:"id"`
-	UserID      int       `json:"user_id"`
-	OrderNumber string    `json:"order"`
-	Sum         float32   `json:"sum"`
-	ProcessedAt time.Time `json:"processed_at"`
+	ID          int       `json:"id" db:"id"`
+	UserID      int       `json:"user_id" db:"user_id"`
+	OrderNumber string    `json:"order" db:"order_number"`
+	Sum         float32   `json:"sum" db:"sum"`
+	ProcessedAt time.Time `json:"processed_at" db:"processed_at"`
 }

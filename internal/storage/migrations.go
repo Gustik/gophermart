@@ -15,7 +15,7 @@ func (s *Storage) RunMigrations(migrationsPath string) error {
 	log.Println("Применение миграций...")
 
 	// Создаём драйвер для БД
-	driver, err := postgres.WithInstance(s.db, &postgres.Config{})
+	driver, err := postgres.WithInstance(s.db.DB, &postgres.Config{})
 	if err != nil {
 		return fmt.Errorf("не удалось создать драйвер миграций: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"syscall"
 	"time"
 
@@ -52,8 +53,11 @@ func main() {
 
 	// Создание HTTP сервера
 	server := &http.Server{
-		Addr:    cfg.RunAddress,
-		Handler: router.Setup(),
+		Addr:         cfg.RunAddress,
+		Handler:      router.Setup(),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	go func() {
@@ -83,7 +87,6 @@ func main() {
 
 // maskPassword маскирует пароль в URI для безопасного логирования
 func maskPassword(uri string) string {
-	// Простая маскировка для примера
-	// TODO: реализовать правильную маскировку
-	return uri
+	re := regexp.MustCompile(`://([^:]+):([^@]+)@`)
+	return re.ReplaceAllString(uri, "://$1:***@")
 }

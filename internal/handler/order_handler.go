@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -13,16 +12,25 @@ import (
 )
 
 type OrderHandler struct {
-	logger       *zap.Logger
+	*BaseHandler
 	orderService service.OrderService
 }
 
 // NewOrderHandler создает новый OrderHandler
 func NewOrderHandler(logger *zap.Logger, orderService service.OrderService) *OrderHandler {
-	return &OrderHandler{
-		logger:       logger,
+	handler := &OrderHandler{
+		BaseHandler:  NewBaseHandler(logger),
 		orderService: orderService,
 	}
+
+	handler.errorStatusMap = map[error]int{
+		validator.ErrEmptyOrderNumber:         http.StatusBadRequest,
+		validator.ErrInvalidOrderFormat:       http.StatusUnprocessableEntity,
+		service.ErrOrderAlreadyUploaded:       http.StatusOK,
+		service.ErrOrderUploadedByAnotherUser: http.StatusConflict,
+	}
+
+	return handler
 }
 
 // UploadOrder загрузка номера заказа
@@ -43,27 +51,13 @@ func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 	orderNumber := strings.TrimSpace(string(body))
 
 	if err := validator.ValidateOrderNumber(orderNumber); err != nil {
-		if errors.Is(err, validator.ErrEmptyOrderNumber) {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if errors.Is(err, validator.ErrInvalidOrderFormat) {
-			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
-			return
-		}
+		h.HandleError(w, err)
+		return
 	}
 
 	err = h.orderService.UploadOrder(r.Context(), userID, orderNumber)
 	if err != nil {
-		if errors.Is(err, service.ErrOrderAlreadyUploaded) {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		if errors.Is(err, service.ErrOrderUploadedByAnotherUser) {
-			http.Error(w, err.Error(), http.StatusConflict)
-			return
-		}
-		http.Error(w, "Внутренняя ошибка сервера", http.StatusInternalServerError)
+		h.HandleError(w, err)
 		return
 	}
 
