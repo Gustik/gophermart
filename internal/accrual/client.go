@@ -2,14 +2,13 @@ package accrual
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
 )
 
@@ -38,21 +37,17 @@ const (
 
 // OrderAccrual представляет информацию о начислении баллов за заказ
 type OrderAccrual struct {
-	Order   string         `json:"order"`
-	Status  AccrualStatus  `json:"status"`
-	Accrual *float32       `json:"accrual,omitempty"`
+	Order   string        `json:"order"`
+	Status  AccrualStatus `json:"status"`
+	Accrual *float32      `json:"accrual,omitempty"`
 }
 
 // Client представляет HTTP-клиент для взаимодействия с системой начисления
 type Client struct {
-	baseURL    string
-	httpClient *http.Client
-	logger     *zap.Logger
-	// Параметры retry логики
-	maxRetries      int
-	initialBackoff  time.Duration
-	maxBackoff      time.Duration
-	backoffMultiple float64
+	client         *resty.Client
+	logger         *zap.Logger
+	initialBackoff time.Duration
+	retryAfter     time.Duration // динамическое значение из заголовка Retry-After
 }
 
 // Config содержит конфигурацию клиента
@@ -68,6 +63,7 @@ type Config struct {
 
 // NewClient создаёт новый клиент для системы начисления
 func NewClient(cfg Config) *Client {
+	// Значения по умолчанию
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 10 * time.Second
 	}
@@ -84,154 +80,145 @@ func NewClient(cfg Config) *Client {
 		cfg.BackoffMultiple = 2.0
 	}
 
-	return &Client{
-		baseURL: cfg.BaseURL,
-		httpClient: &http.Client{
-			Timeout: cfg.Timeout,
-		},
-		logger:          cfg.Logger,
-		maxRetries:      cfg.MaxRetries,
-		initialBackoff:  cfg.InitialBackoff,
-		maxBackoff:      cfg.MaxBackoff,
-		backoffMultiple: cfg.BackoffMultiple,
+	// Создаём клиент (понадобится для замыкания в хуках)
+	accrualClient := &Client{
+		logger:         cfg.Logger,
+		initialBackoff: cfg.InitialBackoff,
 	}
+
+	// Создаём resty клиент
+	client := resty.New().
+		SetBaseURL(cfg.BaseURL).
+		SetTimeout(cfg.Timeout).
+		SetRetryCount(cfg.MaxRetries).
+		SetRetryWaitTime(cfg.InitialBackoff).
+		SetRetryMaxWaitTime(cfg.MaxBackoff).
+		AddRetryCondition(func(r *resty.Response, err error) bool {
+			// Повторяем при ошибках сети или 5xx ошибках
+			if err != nil {
+				return true
+			}
+			// Не повторяем при 204 (заказ не найден)
+			if r.StatusCode() == http.StatusNoContent {
+				return false
+			}
+			// Повторяем при 429 и 500
+			return r.StatusCode() == http.StatusTooManyRequests ||
+				r.StatusCode() == http.StatusInternalServerError
+		}).
+		OnBeforeRequest(func(c *resty.Client, req *resty.Request) error {
+			// Логируем запрос
+			if cfg.Logger != nil {
+				cfg.Logger.Info("отправка запроса в систему начисления",
+					zap.String("url", req.URL),
+					zap.String("method", req.Method),
+				)
+			}
+			return nil
+		}).
+		OnAfterResponse(func(c *resty.Client, resp *resty.Response) error {
+			// Парсим Retry-After при 429 и сохраняем для следующего retry
+			if resp.StatusCode() == http.StatusTooManyRequests {
+				retryAfter := accrualClient.parseRetryAfter(resp.Header().Get("Retry-After"))
+				accrualClient.retryAfter = retryAfter
+
+				if cfg.Logger != nil {
+					cfg.Logger.Warn("получен Retry-After заголовок",
+						zap.Duration("повтор_через", retryAfter),
+					)
+				}
+			}
+
+			// Логируем ответ
+			if cfg.Logger != nil {
+				cfg.Logger.Info("получен ответ от системы начисления",
+					zap.String("url", resp.Request.URL),
+					zap.Int("статус_код", resp.StatusCode()),
+					zap.Duration("время_запроса", resp.Time()),
+				)
+			}
+			return nil
+		}).
+		AddRetryHook(func(r *resty.Response, err error) {
+			// Если есть сохранённое значение Retry-After, используем его
+			if accrualClient.retryAfter > 0 {
+				if cfg.Logger != nil {
+					cfg.Logger.Warn("ожидание перед повтором согласно Retry-After",
+						zap.Duration("задержка", accrualClient.retryAfter),
+					)
+				}
+				time.Sleep(accrualClient.retryAfter)
+				accrualClient.retryAfter = 0 // сбрасываем после использования
+				return
+			}
+
+			// Логируем обычный retry
+			if cfg.Logger != nil {
+				retryCount := r.Request.Attempt
+				cfg.Logger.Warn("повторный запрос в систему начисления",
+					zap.Int("попытка", retryCount),
+					zap.Error(err),
+				)
+			}
+		})
+
+	accrualClient.client = client
+	return accrualClient
 }
 
 // GetOrderAccrual получает информацию о начислении баллов за заказ
 func (c *Client) GetOrderAccrual(ctx context.Context, orderNumber string) (*OrderAccrual, error) {
-	url := fmt.Sprintf("%s/api/orders/%s", c.baseURL, orderNumber)
+	var result OrderAccrual
 
-	var lastErr error
-	backoff := c.initialBackoff
+	resp, err := c.client.R().
+		SetContext(ctx).
+		SetResult(&result).
+		SetPathParam("number", orderNumber).
+		Get("/api/orders/{number}")
 
-	for attempt := 0; attempt <= c.maxRetries; attempt++ {
-		if attempt > 0 {
-			c.logger.Info("повторный запрос в систему начисления",
-				zap.String("заказ", orderNumber),
-				zap.Int("попытка", attempt),
-				zap.Duration("задержка", backoff),
-			)
-
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-time.After(backoff):
-			}
-
-			// Увеличиваем backoff с exponential backoff
-			backoff = time.Duration(float64(backoff) * c.backoffMultiple)
-			if backoff > c.maxBackoff {
-				backoff = c.maxBackoff
-			}
-		}
-
-		accrual, retryAfter, err := c.doRequest(ctx, url, orderNumber)
-		if err == nil {
-			return accrual, nil
-		}
-
-		lastErr = err
-
-		// Если получили 429 с Retry-After, используем это значение
-		if errors.Is(err, ErrTooManyRequests) && retryAfter > 0 {
-			c.logger.Warn("превышен лимит запросов, повтор через",
-				zap.String("заказ", orderNumber),
-				zap.Duration("повтор_через", retryAfter),
-			)
-			backoff = retryAfter
-			continue
-		}
-
-		// Если заказ не найден, не делаем retry
-		if errors.Is(err, ErrOrderNotRegistered) {
-			return nil, err
-		}
-
-		// Для других ошибок продолжаем retry
-		c.logger.Warn("ошибка запроса в систему начисления",
+	if err != nil {
+		c.logger.Error("не удалось выполнить запрос",
 			zap.String("заказ", orderNumber),
 			zap.Error(err),
-			zap.Int("попытка", attempt),
 		)
+		return nil, fmt.Errorf("не удалось отправить запрос: %w", err)
 	}
 
-	c.logger.Error("исчерпаны все попытки повтора",
-		zap.String("заказ", orderNumber),
-		zap.Error(lastErr),
-	)
-
-	return nil, lastErr
-}
-
-// doRequest выполняет HTTP-запрос к системе начисления
-func (c *Client) doRequest(ctx context.Context, url, orderNumber string) (*OrderAccrual, time.Duration, error) {
-	c.logger.Info("отправка запроса в систему начисления",
-		zap.String("url", url),
-		zap.String("заказ", orderNumber),
-	)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, 0, fmt.Errorf("не удалось создать запрос: %w", err)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, 0, fmt.Errorf("не удалось отправить запрос: %w", err)
-	}
-	defer resp.Body.Close()
-
-	c.logger.Info("получен ответ от системы начисления",
-		zap.String("заказ", orderNumber),
-		zap.Int("статус_код", resp.StatusCode),
-	)
-
-	switch resp.StatusCode {
+	// Обрабатываем различные статус-коды
+	switch resp.StatusCode() {
 	case http.StatusOK:
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, 0, fmt.Errorf("не удалось прочитать тело ответа: %w", err)
-		}
-
-		var accrual OrderAccrual
-		if err := json.Unmarshal(body, &accrual); err != nil {
-			return nil, 0, fmt.Errorf("не удалось распарсить ответ: %w", err)
-		}
-
-		c.logger.Info("успешно распарсен ответ системы начисления",
+		c.logger.Info("успешно получена информация о начислении",
 			zap.String("заказ", orderNumber),
-			zap.String("статус", string(accrual.Status)),
-			zap.Any("начисление", accrual.Accrual),
+			zap.String("статус", string(result.Status)),
+			zap.Any("начисление", result.Accrual),
 		)
-
-		return &accrual, 0, nil
+		return &result, nil
 
 	case http.StatusNoContent:
 		c.logger.Info("заказ не зарегистрирован в системе начисления",
 			zap.String("заказ", orderNumber),
 		)
-		return nil, 0, ErrOrderNotRegistered
+		return nil, ErrOrderNotRegistered
 
 	case http.StatusTooManyRequests:
-		retryAfter := c.parseRetryAfter(resp.Header.Get("Retry-After"))
-		c.logger.Warn("превышен лимит запросов",
+		// Retry логика с Retry-After обрабатывается автоматически через retry hooks
+		c.logger.Error("превышен лимит запросов после всех retry попыток",
 			zap.String("заказ", orderNumber),
-			zap.Duration("повтор_через", retryAfter),
 		)
-		return nil, retryAfter, ErrTooManyRequests
+		return nil, ErrTooManyRequests
 
 	case http.StatusInternalServerError:
 		c.logger.Error("внутренняя ошибка системы начисления",
 			zap.String("заказ", orderNumber),
 		)
-		return nil, 0, ErrServerError
+		return nil, ErrServerError
 
 	default:
 		c.logger.Error("неожиданный код ответа от системы начисления",
 			zap.String("заказ", orderNumber),
-			zap.Int("статус_код", resp.StatusCode),
+			zap.Int("статус_код", resp.StatusCode()),
 		)
-		return nil, 0, fmt.Errorf("неожиданный код ответа: %d", resp.StatusCode)
+		return nil, fmt.Errorf("неожиданный код ответа: %d", resp.StatusCode())
 	}
 }
 
