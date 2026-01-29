@@ -32,7 +32,7 @@ func NewOrderService(storage *storage.Storage) OrderService {
 // UploadOrder загружает номер заказа
 func (s *orderService) UploadOrder(ctx context.Context, userID int, orderNumber string) error {
 	order, err := s.storage.GetOrderByNumber(ctx, orderNumber)
-	if err != nil {
+	if err != nil && !errors.Is(err, storage.ErrOrderNotFound) {
 		return err
 	}
 

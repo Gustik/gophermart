@@ -1,7 +1,6 @@
 package accrual
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -62,7 +61,7 @@ type Config struct {
 }
 
 // NewClient создаёт новый клиент для системы начисления
-func NewClient(cfg Config) *Client {
+func NewClient(cfg Config) (*Client, error) {
 	// Значения по умолчанию
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 10 * time.Second
@@ -79,6 +78,9 @@ func NewClient(cfg Config) *Client {
 	if cfg.BackoffMultiple == 0 {
 		cfg.BackoffMultiple = 2.0
 	}
+	if cfg.Logger == nil {
+		return nil, fmt.Errorf("не передан логгер")
+	}
 
 	// Создаём клиент (понадобится для замыкания в хуках)
 	accrualClient := &Client{
@@ -93,133 +95,51 @@ func NewClient(cfg Config) *Client {
 		SetRetryCount(cfg.MaxRetries).
 		SetRetryWaitTime(cfg.InitialBackoff).
 		SetRetryMaxWaitTime(cfg.MaxBackoff).
-		AddRetryCondition(func(r *resty.Response, err error) bool {
-			// Повторяем при ошибках сети или 5xx ошибках
-			if err != nil {
-				return true
-			}
-			// Не повторяем при 204 (заказ не найден)
-			if r.StatusCode() == http.StatusNoContent {
-				return false
-			}
-			// Повторяем при 429 и 500
-			return r.StatusCode() == http.StatusTooManyRequests ||
-				r.StatusCode() == http.StatusInternalServerError
-		}).
-		OnBeforeRequest(func(c *resty.Client, req *resty.Request) error {
-			// Логируем запрос
-			if cfg.Logger != nil {
-				cfg.Logger.Info("отправка запроса в систему начисления",
-					zap.String("url", req.URL),
-					zap.String("method", req.Method),
-				)
-			}
-			return nil
-		}).
-		OnAfterResponse(func(c *resty.Client, resp *resty.Response) error {
-			// Парсим Retry-After при 429 и сохраняем для следующего retry
-			if resp.StatusCode() == http.StatusTooManyRequests {
-				retryAfter := accrualClient.parseRetryAfter(resp.Header().Get("Retry-After"))
-				accrualClient.retryAfter = retryAfter
+		SetLogger(&zapLoggerAdapter{logger: cfg.Logger})
 
-				if cfg.Logger != nil {
-					cfg.Logger.Warn("получен Retry-After заголовок",
-						zap.Duration("повтор_через", retryAfter),
-					)
-				}
-			}
+	// Настраиваем retry условия
+	client.AddRetryCondition(func(r *resty.Response, err error) bool {
+		// Повторяем при ошибках сети или 5xx ошибках
+		if err != nil {
+			return true
+		}
+		// Не повторяем при 204 (заказ не найден)
+		if r.StatusCode() == http.StatusNoContent {
+			return false
+		}
+		// Повторяем при 429 и 500
+		return r.StatusCode() == http.StatusTooManyRequests ||
+			r.StatusCode() == http.StatusInternalServerError
+	})
 
-			// Логируем ответ
-			if cfg.Logger != nil {
-				cfg.Logger.Info("получен ответ от системы начисления",
-					zap.String("url", resp.Request.URL),
-					zap.Int("статус_код", resp.StatusCode()),
-					zap.Duration("время_запроса", resp.Time()),
-				)
-			}
-			return nil
-		}).
-		AddRetryHook(func(r *resty.Response, err error) {
-			// Если есть сохранённое значение Retry-After, используем его
-			if accrualClient.retryAfter > 0 {
-				if cfg.Logger != nil {
-					cfg.Logger.Warn("ожидание перед повтором согласно Retry-After",
-						zap.Duration("задержка", accrualClient.retryAfter),
-					)
-				}
-				time.Sleep(accrualClient.retryAfter)
-				accrualClient.retryAfter = 0 // сбрасываем после использования
-				return
-			}
+	// Обработка Retry-After заголовка
+	client.OnAfterResponse(func(c *resty.Client, resp *resty.Response) error {
+		// Парсим Retry-After при 429 и сохраняем для следующего retry
+		if resp.StatusCode() == http.StatusTooManyRequests {
+			retryAfter := accrualClient.parseRetryAfter(resp.Header().Get("Retry-After"))
+			accrualClient.retryAfter = retryAfter
 
-			// Логируем обычный retry
-			if cfg.Logger != nil {
-				retryCount := r.Request.Attempt
-				cfg.Logger.Warn("повторный запрос в систему начисления",
-					zap.Int("попытка", retryCount),
-					zap.Error(err),
-				)
-			}
-		})
+			accrualClient.logger.Warn("получен Retry-After заголовок",
+				zap.Duration("повтор_через", retryAfter),
+			)
+		}
+		return nil
+	})
+
+	// Кастомная задержка для Retry-After
+	client.AddRetryHook(func(r *resty.Response, err error) {
+		// Если есть сохранённое значение Retry-After, используем его
+		if accrualClient.retryAfter > 0 {
+			accrualClient.logger.Warn("ожидание перед повтором согласно Retry-After",
+				zap.Duration("задержка", accrualClient.retryAfter),
+			)
+			time.Sleep(accrualClient.retryAfter)
+			accrualClient.retryAfter = 0 // сбрасываем после использования
+		}
+	})
 
 	accrualClient.client = client
-	return accrualClient
-}
-
-// GetOrderAccrual получает информацию о начислении баллов за заказ
-func (c *Client) GetOrderAccrual(ctx context.Context, orderNumber string) (*OrderAccrual, error) {
-	var result OrderAccrual
-
-	resp, err := c.client.R().
-		SetContext(ctx).
-		SetResult(&result).
-		SetPathParam("number", orderNumber).
-		Get("/api/orders/{number}")
-
-	if err != nil {
-		c.logger.Error("не удалось выполнить запрос",
-			zap.String("заказ", orderNumber),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("не удалось отправить запрос: %w", err)
-	}
-
-	// Обрабатываем различные статус-коды
-	switch resp.StatusCode() {
-	case http.StatusOK:
-		c.logger.Info("успешно получена информация о начислении",
-			zap.String("заказ", orderNumber),
-			zap.String("статус", string(result.Status)),
-			zap.Any("начисление", result.Accrual),
-		)
-		return &result, nil
-
-	case http.StatusNoContent:
-		c.logger.Info("заказ не зарегистрирован в системе начисления",
-			zap.String("заказ", orderNumber),
-		)
-		return nil, ErrOrderNotRegistered
-
-	case http.StatusTooManyRequests:
-		// Retry логика с Retry-After обрабатывается автоматически через retry hooks
-		c.logger.Error("превышен лимит запросов после всех retry попыток",
-			zap.String("заказ", orderNumber),
-		)
-		return nil, ErrTooManyRequests
-
-	case http.StatusInternalServerError:
-		c.logger.Error("внутренняя ошибка системы начисления",
-			zap.String("заказ", orderNumber),
-		)
-		return nil, ErrServerError
-
-	default:
-		c.logger.Error("неожиданный код ответа от системы начисления",
-			zap.String("заказ", orderNumber),
-			zap.Int("статус_код", resp.StatusCode()),
-		)
-		return nil, fmt.Errorf("неожиданный код ответа: %d", resp.StatusCode())
-	}
+	return accrualClient, nil
 }
 
 // parseRetryAfter парсит заголовок Retry-After

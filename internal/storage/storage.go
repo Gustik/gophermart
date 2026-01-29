@@ -9,6 +9,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
+const pgDuplicateErrorCode = "23505"
+
 // Storage представляет хранилище данных
 type Storage struct {
 	db   *sqlx.DB
