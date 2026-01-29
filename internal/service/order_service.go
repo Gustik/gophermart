@@ -41,7 +41,7 @@ func (s *orderService) UploadOrder(ctx context.Context, userID int, orderNumber 
 
 	if order != nil {
 		if order.UserID != userID {
-			return ErrOrderAlreadyUploaded
+			return ErrOrderUploadedByAnotherUser
 		}
 
 		return ErrOrderAlreadyUploaded
