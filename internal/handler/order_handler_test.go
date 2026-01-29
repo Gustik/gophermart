@@ -11,12 +11,14 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/Gustik/gophermart/internal/auth"
+	"github.com/Gustik/gophermart/internal/model"
 	"github.com/Gustik/gophermart/internal/service"
 )
 
 // MockOrderService для тестирования
 type MockOrderService struct {
-	UploadOrderFunc func(ctx context.Context, userID int, orderNumber string) error
+	UploadOrderFunc     func(ctx context.Context, userID int, orderNumber string) error
+	GetOrdersByUserFunc func(ctx context.Context, userID int) ([]model.Order, error)
 }
 
 func (m *MockOrderService) UploadOrder(ctx context.Context, userID int, orderNumber string) error {
@@ -26,18 +28,26 @@ func (m *MockOrderService) UploadOrder(ctx context.Context, userID int, orderNum
 	return nil
 }
 
+func (m *MockOrderService) GetOrdersByUser(ctx context.Context, userID int) ([]model.Order, error) {
+	if m.GetOrdersByUserFunc != nil {
+		return m.GetOrdersByUserFunc(ctx, userID)
+	}
+	return nil, nil
+}
+
 func TestOrderHandler_UploadOrder(t *testing.T) {
 	logger := zap.NewNop()
 
 	tests := []struct {
-		name              string
-		requestBody       string
-		userID            int
-		setupContext      bool
-		mockUploadFunc    func(ctx context.Context, userID int, orderNumber string) error
-		expectedStatus    int
-		expectedBodyPart  string
-		checkBodyContains bool
+		name                    string
+		requestBody             string
+		userID                  int
+		setupContext            bool
+		mockUploadFunc          func(ctx context.Context, userID int, orderNumber string) error
+		mockGetOrdersByUserFunc func(ctx context.Context, userID int) ([]model.Order, error)
+		expectedStatus          int
+		expectedBodyPart        string
+		checkBodyContains       bool
 	}{
 		{
 			name:         "Успешная загрузка - новый заказ",
@@ -164,7 +174,8 @@ func TestOrderHandler_UploadOrder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockService := &MockOrderService{
-				UploadOrderFunc: tt.mockUploadFunc,
+				UploadOrderFunc:     tt.mockUploadFunc,
+				GetOrdersByUserFunc: tt.mockGetOrdersByUserFunc,
 			}
 
 			handler := NewOrderHandler(logger, mockService)

@@ -121,3 +121,25 @@ func (s *Storage) UpdateOrderStatus(ctx context.Context, orderNumber string, sta
 
 	return nil
 }
+
+// GetOrdersByUser возвращает заказыва пользователя
+func (s *Storage) GetOrdersByUser(ctx context.Context, userID int) ([]model.Order, error) {
+	query, args, err := s.psql.
+		Select("id", "user_id", "number", "status", "accrual", "uploaded_at").
+		From("orders").
+		Where(sq.Eq{"user_id": userID}).
+		OrderBy("uploaded_at DESC").
+		ToSql()
+
+	if err != nil {
+		return nil, fmt.Errorf("не удалось построить запрос: %w", err)
+	}
+
+	var orders []model.Order
+	err = s.db.SelectContext(ctx, &orders, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("не удалось получить заказы: %w", err)
+	}
+
+	return orders, nil
+}

@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/Gustik/gophermart/internal/accrual"
 	"github.com/Gustik/gophermart/internal/config"
 	"github.com/Gustik/gophermart/internal/handler"
@@ -18,7 +20,6 @@ import (
 	"github.com/Gustik/gophermart/internal/storage"
 	"github.com/Gustik/gophermart/internal/worker"
 	"github.com/Gustik/gophermart/internal/zaplog"
-	"go.uber.org/zap"
 )
 
 func main() {

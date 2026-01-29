@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -28,6 +29,7 @@ func NewOrderHandler(logger *zap.Logger, orderService service.OrderService) *Ord
 		validator.ErrInvalidOrderFormat:       http.StatusUnprocessableEntity,
 		service.ErrOrderAlreadyUploaded:       http.StatusOK,
 		service.ErrOrderUploadedByAnotherUser: http.StatusConflict,
+		service.ErrNoOrders:                   http.StatusNoContent,
 	}
 
 	return handler
@@ -62,4 +64,22 @@ func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h *OrderHandler) GetOrders(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "Не авторизован", http.StatusUnauthorized)
+		return
+	}
+
+	orders, err := h.orderService.GetOrdersByUser(r.Context(), userID)
+	if err != nil {
+		h.HandleError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(orders)
 }

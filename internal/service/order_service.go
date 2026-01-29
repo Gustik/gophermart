@@ -4,17 +4,20 @@ import (
 	"context"
 	"errors"
 
+	"github.com/Gustik/gophermart/internal/model"
 	"github.com/Gustik/gophermart/internal/storage"
 )
 
 var (
 	ErrOrderAlreadyUploaded       = errors.New("заказ уже был загружен этим пользователем")
 	ErrOrderUploadedByAnotherUser = errors.New("заказ уже был загружен другим пользователем")
+	ErrNoOrders                   = errors.New("не заказов")
 )
 
 // OrderService определяет методы для сервиса заказов
 type OrderService interface {
 	UploadOrder(ctx context.Context, userID int, orderNumber string) error
+	GetOrdersByUser(ctx context.Context, userID int) ([]model.Order, error)
 }
 
 // orderService предоставляет бизнес-логику для заказов
@@ -50,4 +53,17 @@ func (s *orderService) UploadOrder(ctx context.Context, userID int, orderNumber 
 	}
 
 	return nil
+}
+
+// GetOrdersByUser возвращает заказы пользователя
+func (s *orderService) GetOrdersByUser(ctx context.Context, userID int) ([]model.Order, error) {
+	orders, err := s.storage.GetOrdersByUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if len(orders) == 0 {
+		return nil, ErrNoOrders
+	}
+
+	return orders, nil
 }

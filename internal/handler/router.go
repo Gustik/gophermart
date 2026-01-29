@@ -48,6 +48,7 @@ func (rt *Router) Setup() http.Handler {
 		r.Get("/api/user/check", rt.authHandler.Check)
 		r.With(myMiddleware.RequireContentType("text/plain")).
 			Post("/api/user/orders", rt.orderHandler.UploadOrder)
+		r.Get("/api/user/orders", rt.orderHandler.GetOrders)
 	})
 
 	return r
