@@ -2,6 +2,7 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Masterminds/squirrel"
@@ -37,5 +38,18 @@ func (s *Storage) Close() error {
 
 // DB возвращает объект базы данных
 func (s *Storage) DB() *sqlx.DB {
+	return s.db
+}
+
+// BeginTx начинает транзакцию
+func (s *Storage) BeginTx(ctx context.Context) (*sqlx.Tx, error) {
+	return s.db.BeginTxx(ctx, nil)
+}
+
+// getExecutor возвращает executor (транзакция или обычное соединение)
+func (s *Storage) getExecutor(tx *sqlx.Tx) sqlx.ExtContext {
+	if tx != nil {
+		return tx
+	}
 	return s.db
 }

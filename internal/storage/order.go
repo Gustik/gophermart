@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 
 	"github.com/Gustik/gophermart/internal/model"
@@ -89,7 +90,7 @@ func (s *Storage) GetPendingOrders(ctx context.Context) ([]model.Order, error) {
 }
 
 // UpdateOrderStatus обновляет статус и сумму начисления для заказа
-func (s *Storage) UpdateOrderStatus(ctx context.Context, orderNumber string, status model.OrderStatus, accrual *float32) error {
+func (s *Storage) UpdateOrderStatus(ctx context.Context, tx *sqlx.Tx, orderNumber string, status model.OrderStatus, accrual *float32) error {
 	updateBuilder := s.psql.
 		Update("orders").
 		Set("status", status).
@@ -105,7 +106,7 @@ func (s *Storage) UpdateOrderStatus(ctx context.Context, orderNumber string, sta
 		return fmt.Errorf("не удалось построить запрос: %w", err)
 	}
 
-	result, err := s.db.ExecContext(ctx, query, args...)
+	result, err := s.getExecutor(tx).ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("не удалось обновить статус заказа: %w", err)
 	}

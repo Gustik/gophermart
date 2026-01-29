@@ -32,47 +32,62 @@ func (s *AccrualService) ProcessPendingOrders(ctx context.Context) error {
 	}
 
 	for i := range orders {
-		acc, err := s.client.GetOrderAccrual(ctx, orders[i].Number)
-		if err != nil {
-			if errors.Is(err, accrual.ErrOrderNotRegistered) {
-				continue
-			}
-
-			s.logger.Error("не удалось получить статус заказа",
+		if err := s.processOrder(ctx, &orders[i]); err != nil {
+			s.logger.Error("не удалось обработать заказ",
 				zap.String("order", orders[i].Number),
 				zap.Error(err),
 			)
-			continue
 		}
+	}
 
-		switch acc.Status {
-		case accrual.AccrualStatusRegistered:
-			if err = s.storage.UpdateOrderStatus(ctx, orders[i].Number, model.OrderStatusProcessing, nil); err != nil {
-				s.logger.Error("не удалось обновить статус заказа",
-					zap.String("order", orders[i].Number),
-					zap.Error(err),
-				)
-				continue
-			}
-		case accrual.AccrualStatusProcessing:
-			continue
-		case accrual.AccrualStatusInvalid:
-			if err = s.storage.UpdateOrderStatus(ctx, orders[i].Number, model.OrderStatusInvalid, nil); err != nil {
-				s.logger.Error("не удалось обновить статус заказа",
-					zap.String("order", orders[i].Number),
-					zap.Error(err),
-				)
-				continue
-			}
-		case accrual.AccrualStatusProcessed:
-			if err = s.storage.UpdateOrderStatus(ctx, orders[i].Number, model.OrderStatusProcessed, acc.Accrual); err != nil {
-				s.logger.Error("не удалось обновить статус заказа",
-					zap.String("order", orders[i].Number),
-					zap.Error(err),
-				)
-				continue
-			}
+	return nil
+}
+
+func (s *AccrualService) processOrder(ctx context.Context, order *model.Order) error {
+	acc, err := s.client.GetOrderAccrual(ctx, order.Number)
+	if err != nil {
+		if errors.Is(err, accrual.ErrOrderNotRegistered) {
+			return nil // не ошибка, просто пропускаем
 		}
+		return fmt.Errorf("не удалось получить статус: %w", err)
+	}
+
+	switch acc.Status {
+	case accrual.AccrualStatusRegistered:
+		return s.storage.UpdateOrderStatus(ctx, nil, order.Number, model.OrderStatusProcessing, nil)
+
+	case accrual.AccrualStatusProcessing:
+		return nil // ждём дальнейшей обработки
+
+	case accrual.AccrualStatusInvalid:
+		return s.storage.UpdateOrderStatus(ctx, nil, order.Number, model.OrderStatusInvalid, nil)
+
+	case accrual.AccrualStatusProcessed:
+		return s.processCompletedOrder(ctx, order, acc)
+	}
+
+	return nil
+}
+
+func (s *AccrualService) processCompletedOrder(ctx context.Context, order *model.Order, acc *accrual.OrderAccrual) error {
+	tx, err := s.storage.BeginTx(ctx)
+	if err != nil {
+		return fmt.Errorf("не удалось начать транзакцию: %w", err)
+	}
+	defer tx.Rollback()
+
+	if err := s.storage.UpdateOrderStatus(ctx, tx, order.Number, model.OrderStatusProcessed, acc.Accrual); err != nil {
+		return fmt.Errorf("не удалось обновить статус: %w", err)
+	}
+
+	if acc.Accrual != nil && *acc.Accrual > 0 {
+		if err := s.storage.AddBalance(ctx, tx, order.UserID, acc.Accrual); err != nil {
+			return fmt.Errorf("не удалось обновить баланс: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("не удалось закоммитить транзакцию: %w", err)
 	}
 
 	return nil

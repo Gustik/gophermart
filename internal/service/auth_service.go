@@ -60,7 +60,7 @@ func (s *authService) Register(ctx context.Context, login, password string) (str
 	}
 
 	// Создаём баланс для пользователя
-	if err := s.storage.CreateBalance(ctx, user.ID); err != nil {
+	if err := s.storage.InitBalance(ctx, user.ID); err != nil {
 		return "", fmt.Errorf("ошибка создания баланса: %w", err)
 	}
 
