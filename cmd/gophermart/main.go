@@ -111,7 +111,8 @@ func startAccrualWorker(logger *zap.Logger, store *storage.Storage, accrualSyste
 func startServer(store *storage.Storage, logger *zap.Logger, addr, JWTSecret string) *http.Server {
 	authService := service.NewAuthService(JWTSecret, store)
 	orderService := service.NewOrderService(store)
-	router := handler.NewRouter(JWTSecret, logger, authService, orderService)
+	balanceService := service.NewBalanceService(store)
+	router := handler.NewRouter(JWTSecret, logger, authService, orderService, balanceService)
 
 	server := &http.Server{
 		Addr:         addr,
