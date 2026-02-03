@@ -232,6 +232,123 @@ func (errReader) Read(p []byte) (n int, err error) {
 	return 0, errors.New("read error")
 }
 
+func TestOrderHandler_GetOrders(t *testing.T) {
+	logger := zap.NewNop()
+
+	tests := []struct {
+		name                    string
+		userID                  int
+		setupContext            bool
+		mockGetOrdersByUserFunc func(ctx context.Context, userID int) ([]model.Order, error)
+		expectedStatus          int
+		expectedBodyPart        string
+		checkBodyContains       bool
+		checkJSON               bool
+	}{
+		{
+			name:         "Успешное получение списка заказов",
+			userID:       123,
+			setupContext: true,
+			mockGetOrdersByUserFunc: func(ctx context.Context, userID int) ([]model.Order, error) {
+				if userID != 123 {
+					t.Errorf("Ожидался userID=123, получен %d", userID)
+				}
+				return []model.Order{
+					{
+						ID:      1,
+						UserID:  123,
+						Number:  "12345678903",
+						Status:  model.OrderStatusNew,
+						Accrual: nil,
+					},
+					{
+						ID:      2,
+						UserID:  123,
+						Number:  "79927398713",
+						Status:  model.OrderStatusProcessing,
+						Accrual: nil,
+					},
+				}, nil
+			},
+			expectedStatus: http.StatusOK,
+			checkJSON:      true,
+		},
+		{
+			name:         "Заказы не найдены",
+			userID:       123,
+			setupContext: true,
+			mockGetOrdersByUserFunc: func(ctx context.Context, userID int) ([]model.Order, error) {
+				return nil, service.ErrNoOrders
+			},
+			expectedStatus: http.StatusNoContent,
+		},
+		{
+			name:              "Отсутствует контекст авторизации",
+			setupContext:      false,
+			expectedStatus:    http.StatusUnauthorized,
+			expectedBodyPart:  "Не авторизован",
+			checkBodyContains: true,
+		},
+		{
+			name:         "Внутренняя ошибка сервера",
+			userID:       123,
+			setupContext: true,
+			mockGetOrdersByUserFunc: func(ctx context.Context, userID int) ([]model.Order, error) {
+				return nil, errors.New("database connection error")
+			},
+			expectedStatus:    http.StatusInternalServerError,
+			expectedBodyPart:  "Внутренняя ошибка сервера",
+			checkBodyContains: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockService := &MockOrderService{
+				GetOrdersByUserFunc: tt.mockGetOrdersByUserFunc,
+			}
+
+			handler := NewOrderHandler(logger, mockService)
+
+			req := httptest.NewRequest(http.MethodGet, "/api/user/orders", nil)
+
+			// Устанавливаем userID в контекст, если требуется
+			if tt.setupContext {
+				ctx := auth.SetUserID(req.Context(), tt.userID)
+				req = req.WithContext(ctx)
+			}
+
+			rr := httptest.NewRecorder()
+
+			handler.GetOrders(rr, req)
+
+			if rr.Code != tt.expectedStatus {
+				t.Errorf("Ожидался статус %d, получен %d. Тело: %s", tt.expectedStatus, rr.Code, rr.Body.String())
+			}
+
+			if tt.checkBodyContains {
+				body := rr.Body.String()
+				if !contains(body, tt.expectedBodyPart) {
+					t.Errorf("Ожидалось, что тело содержит %q, получено %q", tt.expectedBodyPart, body)
+				}
+			}
+
+			if tt.checkJSON {
+				contentType := rr.Header().Get("Content-Type")
+				if contentType != "application/json" {
+					t.Errorf("Ожидался Content-Type application/json, получен %s", contentType)
+				}
+
+				// Проверяем, что тело содержит валидный JSON с заказами
+				body := rr.Body.String()
+				if body == "" {
+					t.Error("Ожидался непустой JSON ответ")
+				}
+			}
+		})
+	}
+}
+
 // Вспомогательная функция для проверки содержимого строки
 func contains(str, substr string) bool {
 	return len(str) >= len(substr) && (str == substr || len(substr) == 0 ||
