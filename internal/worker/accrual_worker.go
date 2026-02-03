@@ -13,19 +13,17 @@ type AccrualWorker struct {
 	service      *service.AccrualService
 	logger       *zap.Logger
 	pollInterval time.Duration // как часто опрашивать
-	batchSize    int           // сколько заказов обрабатывать за раз
 	stopCh       chan struct{} // для graceful shutdown
 	doneCh       chan struct{} // сигнал что worker остановлен
 	ctx          context.Context
 	cancel       context.CancelFunc
 }
 
-func NewAccrualWorker(service *service.AccrualService, logger *zap.Logger, pollInterval time.Duration, batchSize int) *AccrualWorker {
+func NewAccrualWorker(service *service.AccrualService, logger *zap.Logger, pollInterval time.Duration) *AccrualWorker {
 	return &AccrualWorker{
 		service:      service,
 		logger:       logger,
 		pollInterval: pollInterval,
-		batchSize:    batchSize,
 		stopCh:       make(chan struct{}),
 		doneCh:       make(chan struct{}),
 	}

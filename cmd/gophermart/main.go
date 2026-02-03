@@ -103,7 +103,7 @@ func mustInitAccrualClient(logger *zap.Logger, baseURL string) accrual.Client {
 func startAccrualWorker(logger *zap.Logger, store storage.Storage, accrualSystemAddress string) *worker.AccrualWorker {
 	accrualClient := mustInitAccrualClient(logger, accrualSystemAddress)
 	accrualService := service.NewAccrualService(accrualClient, store, logger)
-	w := worker.NewAccrualWorker(accrualService, logger, time.Second*2, 10)
+	w := worker.NewAccrualWorker(accrualService, logger, time.Second*2)
 	w.Start()
 	return w
 }

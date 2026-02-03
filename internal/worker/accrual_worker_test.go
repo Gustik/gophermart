@@ -12,11 +12,10 @@ import (
 func TestNewAccrualWorker(t *testing.T) {
 	logger := zap.NewNop()
 	pollInterval := 5 * time.Second
-	batchSize := 10
 
 	// Создаем AccrualService с nil зависимостями для теста
 	accrualService := service.NewAccrualService(nil, nil, logger)
-	worker := NewAccrualWorker(accrualService, logger, pollInterval, batchSize)
+	worker := NewAccrualWorker(accrualService, logger, pollInterval)
 
 	if worker == nil {
 		t.Fatal("NewAccrualWorker() вернул nil")
@@ -24,10 +23,6 @@ func TestNewAccrualWorker(t *testing.T) {
 
 	if worker.pollInterval != pollInterval {
 		t.Errorf("pollInterval = %v, ожидалось %v", worker.pollInterval, pollInterval)
-	}
-
-	if worker.batchSize != batchSize {
-		t.Errorf("batchSize = %v, ожидалось %v", worker.batchSize, batchSize)
 	}
 
 	if worker.logger == nil {
@@ -48,7 +43,7 @@ func TestAccrualWorker_StartStop(t *testing.T) {
 	accrualService := service.NewAccrualService(nil, nil, logger)
 
 	// Используем большой интервал, чтобы ticker не успел сработать
-	worker := NewAccrualWorker(accrualService, logger, 10*time.Second, 10)
+	worker := NewAccrualWorker(accrualService, logger, 10*time.Second)
 
 	// Запускаем worker
 	worker.Start()
@@ -69,7 +64,7 @@ func TestAccrualWorker_StartStop(t *testing.T) {
 func TestAccrualWorker_StopWithoutStart(t *testing.T) {
 	logger := zap.NewNop()
 	accrualService := service.NewAccrualService(nil, nil, logger)
-	worker := NewAccrualWorker(accrualService, logger, 1*time.Second, 10)
+	worker := NewAccrualWorker(accrualService, logger, 1*time.Second)
 
 	// Пытаемся остановить worker, который не был запущен
 	// Это вызовет panic, так как cancel == nil
@@ -99,7 +94,7 @@ func TestAccrualWorker_StopWithoutStart(t *testing.T) {
 func TestAccrualWorker_QuickStartStop(t *testing.T) {
 	logger := zap.NewNop()
 	accrualService := service.NewAccrualService(nil, nil, logger)
-	worker := NewAccrualWorker(accrualService, logger, 10*time.Millisecond, 10)
+	worker := NewAccrualWorker(accrualService, logger, 10*time.Millisecond)
 
 	// Быстрый запуск и остановка
 	worker.Start()
@@ -117,12 +112,12 @@ func TestAccrualWorker_MultipleStartStop(t *testing.T) {
 
 	// Используем большой интервал, чтобы ticker не успел сработать
 	// и не вызвал ProcessPendingOrders с nil зависимостями
-	worker1 := NewAccrualWorker(accrualService, logger, 10*time.Second, 10)
+	worker1 := NewAccrualWorker(accrualService, logger, 10*time.Second)
 	worker1.Start()
 	worker1.Stop()
 
 	// Второй worker
-	worker2 := NewAccrualWorker(accrualService, logger, 10*time.Second, 10)
+	worker2 := NewAccrualWorker(accrualService, logger, 10*time.Second)
 	worker2.Start()
 	worker2.Stop()
 }
@@ -143,14 +138,10 @@ func TestAccrualWorker_DifferentIntervals(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			worker := NewAccrualWorker(accrualService, logger, tt.pollInterval, tt.batchSize)
+			worker := NewAccrualWorker(accrualService, logger, tt.pollInterval)
 
 			if worker.pollInterval != tt.pollInterval {
 				t.Errorf("pollInterval = %v, ожидалось %v", worker.pollInterval, tt.pollInterval)
-			}
-
-			if worker.batchSize != tt.batchSize {
-				t.Errorf("batchSize = %v, ожидалось %v", worker.batchSize, tt.batchSize)
 			}
 		})
 	}

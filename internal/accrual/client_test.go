@@ -82,7 +82,7 @@ func TestGetOrderAccrual_TooManyRequests(t *testing.T) {
 	client, err := NewClient(Config{
 		BaseURL:        server.URL,
 		Logger:         logger,
-		MaxRetries:     1,           // Минимум retry
+		MaxRetries:     1,                    // Минимум retry
 		InitialBackoff: 1 * time.Millisecond, // Быстрый backoff
 	})
 	if err != nil {
@@ -108,7 +108,7 @@ func TestGetOrderAccrual_InternalServerError(t *testing.T) {
 	client, err := NewClient(Config{
 		BaseURL:        server.URL,
 		Logger:         logger,
-		MaxRetries:     1,                     // Минимум retry
+		MaxRetries:     1,                    // Минимум retry
 		InitialBackoff: 1 * time.Millisecond, // Быстрый backoff
 	})
 	if err != nil {
@@ -118,6 +118,34 @@ func TestGetOrderAccrual_InternalServerError(t *testing.T) {
 	result, err := client.GetOrderAccrual(context.Background(), "12345678903")
 	if err == nil {
 		t.Error("Ожидалась ошибка для 500 статуса")
+	}
+	if result != nil {
+		t.Error("Result должен быть nil при ошибке")
+	}
+}
+
+func TestGetOrderAccrual_UnknowError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(505)
+	}))
+	defer server.Close()
+
+	logger := zap.NewNop()
+	client, err := NewClient(Config{
+		BaseURL:        server.URL,
+		Logger:         logger,
+		MaxRetries:     1,                    // Минимум retry
+		InitialBackoff: 1 * time.Millisecond, // Быстрый backoff
+	})
+	if err != nil {
+		t.Fatalf("Не удалось создать клиент: %v", err)
+	}
+
+	result, err := client.GetOrderAccrual(context.Background(), "12345678903")
+
+	expectedError := "неожиданный код ответа: 505"
+	if err == nil || err.Error() != expectedError {
+		t.Errorf("Ожидалась ошибка %q, получена %q", expectedError, err)
 	}
 	if result != nil {
 		t.Error("Result должен быть nil при ошибке")
@@ -136,7 +164,7 @@ func TestGetOrderAccrual_InvalidJSON(t *testing.T) {
 	client, err := NewClient(Config{
 		BaseURL:        server.URL,
 		Logger:         logger,
-		MaxRetries:     1,                     // Минимум retry
+		MaxRetries:     1,                    // Минимум retry
 		InitialBackoff: 1 * time.Millisecond, // Быстрый backoff
 	})
 	if err != nil {
