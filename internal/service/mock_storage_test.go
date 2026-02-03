@@ -43,6 +43,9 @@ type mockStorage struct {
 	getUserByLoginFunc    func(ctx context.Context, login string) (*model.User, error)
 	createUserFunc        func(ctx context.Context, login, passwordHash string) (*model.User, error)
 	initBalanceFunc       func(ctx context.Context, userID int) error
+	getOrderByNumberFunc  func(ctx context.Context, number string) (*model.Order, error)
+	createOrderFunc       func(ctx context.Context, userID int, number string) error
+	getOrdersByUserFunc   func(ctx context.Context, userID int) ([]model.Order, error)
 }
 
 func (m *mockStorage) GetBalance(ctx context.Context, tx storage.Tx, userID int) (*model.Balance, error) {
@@ -97,12 +100,21 @@ func (m *mockStorage) GetUserByLogin(ctx context.Context, login string) (*model.
 	return nil, errors.New("not implemented")
 }
 func (m *mockStorage) CreateOrder(ctx context.Context, userID int, number string) error {
+	if m.createOrderFunc != nil {
+		return m.createOrderFunc(ctx, userID, number)
+	}
 	return errors.New("not implemented")
 }
 func (m *mockStorage) GetOrderByNumber(ctx context.Context, number string) (*model.Order, error) {
+	if m.getOrderByNumberFunc != nil {
+		return m.getOrderByNumberFunc(ctx, number)
+	}
 	return nil, errors.New("not implemented")
 }
 func (m *mockStorage) GetOrdersByUser(ctx context.Context, userID int) ([]model.Order, error) {
+	if m.getOrdersByUserFunc != nil {
+		return m.getOrdersByUserFunc(ctx, userID)
+	}
 	return nil, errors.New("not implemented")
 }
 func (m *mockStorage) GetPendingOrders(ctx context.Context) ([]model.Order, error) {
