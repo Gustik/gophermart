@@ -2,8 +2,6 @@ package config
 
 import (
 	"flag"
-	"fmt"
-	"net/url"
 	"os"
 )
 
@@ -35,38 +33,4 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
-}
-
-// Info возвращает информацию о конфигурации для логирования
-func (c *Config) Info() string {
-	return fmt.Sprintf(
-		"Конфигурация сервера:\n"+
-			"  Адрес сервера: %s\n"+
-			"  База данных: %s\n"+
-			"  Система начисления: %s",
-		c.RunAddress,
-		maskPassword(c.DatabaseURI),
-		c.AccrualSystemAddress,
-	)
-}
-
-// maskPassword маскирует пароль в URI
-func maskPassword(uri string) string {
-	if uri == "" {
-		return ""
-	}
-
-	// Парсим URI
-	parsedURL, err := url.Parse(uri)
-	if err != nil {
-		return uri
-	}
-
-	// Если есть пароль, заменяем на ***
-	if parsedURL.User != nil {
-		username := parsedURL.User.Username()
-		parsedURL.User = url.UserPassword(username, "***")
-	}
-
-	return parsedURL.String()
 }
