@@ -25,11 +25,11 @@ type AuthService interface {
 // authService предоставляет бизнес-логику для аутентификации
 type authService struct {
 	jwtSecret string
-	storage   *storage.Storage
+	storage   storage.Storage
 }
 
 // NewAuthService создаёт новый AuthService
-func NewAuthService(jwtSecret string, storage *storage.Storage) AuthService {
+func NewAuthService(jwtSecret string, storage storage.Storage) AuthService {
 	return &authService{
 		jwtSecret: jwtSecret,
 		storage:   storage,

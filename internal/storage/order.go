@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 
 	"github.com/Gustik/gophermart/internal/model"
@@ -19,7 +18,7 @@ var (
 )
 
 // GetOrderByNumber возвращает заказ по номеру
-func (s *Storage) GetOrderByNumber(ctx context.Context, number string) (*model.Order, error) {
+func (s *storage) GetOrderByNumber(ctx context.Context, number string) (*model.Order, error) {
 	query, args, err := s.psql.
 		Select("id", "user_id", "number", "status", "accrual").
 		From("orders").
@@ -43,7 +42,7 @@ func (s *Storage) GetOrderByNumber(ctx context.Context, number string) (*model.O
 }
 
 // CreateOrder создает запись номера заказа
-func (s *Storage) CreateOrder(ctx context.Context, userID int, number string) error {
+func (s *storage) CreateOrder(ctx context.Context, userID int, number string) error {
 	query, args, err := s.psql.
 		Insert("orders").
 		Columns("user_id", "number", "status").
@@ -69,7 +68,7 @@ func (s *Storage) CreateOrder(ctx context.Context, userID int, number string) er
 }
 
 // GetPendingOrders возвращает заказы, ожидающие обработки (NEW, PROCESSING)
-func (s *Storage) GetPendingOrders(ctx context.Context) ([]model.Order, error) {
+func (s *storage) GetPendingOrders(ctx context.Context) ([]model.Order, error) {
 	query, args, err := s.psql.
 		Select("id", "user_id", "number", "status", "accrual").
 		From("orders").
@@ -90,7 +89,7 @@ func (s *Storage) GetPendingOrders(ctx context.Context) ([]model.Order, error) {
 }
 
 // UpdateOrderStatus обновляет статус и сумму начисления для заказа
-func (s *Storage) UpdateOrderStatus(ctx context.Context, tx *sqlx.Tx, orderNumber string, status model.OrderStatus, accrual *float32) error {
+func (s *storage) UpdateOrderStatus(ctx context.Context, tx Tx, orderNumber string, status model.OrderStatus, accrual *float32) error {
 	updateBuilder := s.psql.
 		Update("orders").
 		Set("status", status).
@@ -124,7 +123,7 @@ func (s *Storage) UpdateOrderStatus(ctx context.Context, tx *sqlx.Tx, orderNumbe
 }
 
 // GetOrdersByUser возвращает заказыва пользователя
-func (s *Storage) GetOrdersByUser(ctx context.Context, userID int) ([]model.Order, error) {
+func (s *storage) GetOrdersByUser(ctx context.Context, userID int) ([]model.Order, error) {
 	query, args, err := s.psql.
 		Select("id", "user_id", "number", "status", "accrual", "uploaded_at").
 		From("orders").

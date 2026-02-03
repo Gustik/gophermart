@@ -5,19 +5,20 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/Gustik/gophermart/internal/accrual"
 	"github.com/Gustik/gophermart/internal/model"
 	"github.com/Gustik/gophermart/internal/storage"
-	"go.uber.org/zap"
 )
 
 type AccrualService struct {
 	client  *accrual.Client
-	storage *storage.Storage
+	storage storage.Storage
 	logger  *zap.Logger
 }
 
-func NewAccrualService(client *accrual.Client, storage *storage.Storage, logger *zap.Logger) *AccrualService {
+func NewAccrualService(client *accrual.Client, storage storage.Storage, logger *zap.Logger) *AccrualService {
 	return &AccrualService{
 		client:  client,
 		storage: storage,

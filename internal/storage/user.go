@@ -11,7 +11,7 @@ import (
 )
 
 // CreateUser создаёт нового пользователя в БД
-func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (*model.User, error) {
+func (s *storage) CreateUser(ctx context.Context, login, passwordHash string) (*model.User, error) {
 	query, args, err := s.psql.
 		Insert("users").
 		Columns("login", "password_hash").
@@ -33,7 +33,7 @@ func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (*
 }
 
 // GetUserByLogin получает пользователя по логину
-func (s *Storage) GetUserByLogin(ctx context.Context, login string) (*model.User, error) {
+func (s *storage) GetUserByLogin(ctx context.Context, login string) (*model.User, error) {
 	query, args, err := s.psql.
 		Select("id", "login", "password_hash", "created_at").
 		From("users").

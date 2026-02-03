@@ -53,8 +53,6 @@ func (rt *Router) Setup() http.Handler {
 	r.Group(func(r chi.Router) {
 		r.Use(myMiddleware.AuthMiddleware(rt.jwtSecret))
 
-		r.Get("/api/user/check", rt.authHandler.Check)
-
 		// Заказы
 		r.With(myMiddleware.RequireContentType("text/plain")).
 			Post("/api/user/orders", rt.orderHandler.UploadOrder)

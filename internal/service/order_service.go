@@ -22,11 +22,11 @@ type OrderService interface {
 
 // orderService предоставляет бизнес-логику для заказов
 type orderService struct {
-	storage *storage.Storage
+	storage storage.Storage
 }
 
 // NewOrderService создаёт новый OrderService
-func NewOrderService(storage *storage.Storage) OrderService {
+func NewOrderService(storage storage.Storage) OrderService {
 	return &orderService{
 		storage: storage,
 	}

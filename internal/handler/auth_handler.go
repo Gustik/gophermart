@@ -3,9 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
-	"github.com/Gustik/gophermart/internal/auth"
 	"github.com/Gustik/gophermart/internal/service"
 	"go.uber.org/zap"
 )
@@ -76,15 +74,4 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Authorization", "Bearer "+token)
 	w.WriteHeader(http.StatusOK)
-}
-
-// Check хендлер для проверки авторизации
-func (h *AuthHandler) Check(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.GetUserID(r.Context())
-	if !ok {
-		w.Write([]byte("no auth"))
-		return
-	}
-
-	w.Write([]byte(strconv.Itoa(userID)))
 }

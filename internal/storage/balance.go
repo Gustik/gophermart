@@ -5,13 +5,12 @@ import (
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/jmoiron/sqlx"
 
 	"github.com/Gustik/gophermart/internal/model"
 )
 
 // InitBalance инициализирует баланс для нового пользователя
-func (s *Storage) InitBalance(ctx context.Context, userID int) error {
+func (s *storage) InitBalance(ctx context.Context, userID int) error {
 	query, args, err := s.psql.
 		Insert("balance").
 		Columns("user_id", "current", "withdrawn").
@@ -31,7 +30,7 @@ func (s *Storage) InitBalance(ctx context.Context, userID int) error {
 }
 
 // AddBalance добавляет баллы к балансу пользователя
-func (s *Storage) AddBalance(ctx context.Context, tx *sqlx.Tx, userID int, amount *float32) error {
+func (s *storage) AddBalance(ctx context.Context, tx Tx, userID int, amount *float32) error {
 	query, args, err := s.psql.
 		Update("balance").
 		Set("current", sq.Expr("current + ?", amount)).
@@ -52,7 +51,7 @@ func (s *Storage) AddBalance(ctx context.Context, tx *sqlx.Tx, userID int, amoun
 }
 
 // GetBalance возвращает текущий баланс пользователя
-func (s *Storage) GetBalance(ctx context.Context, tx *sqlx.Tx, userID int) (*model.Balance, error) {
+func (s *storage) GetBalance(ctx context.Context, tx Tx, userID int) (*model.Balance, error) {
 	builder := s.psql.
 		Select("user_id", "current", "withdrawn", "updated_at").
 		From("balance").
@@ -82,7 +81,7 @@ func (s *Storage) GetBalance(ctx context.Context, tx *sqlx.Tx, userID int) (*mod
 }
 
 // WithdrawBalance списывает средства с баланса пользователя
-func (s *Storage) WithdrawBalance(ctx context.Context, tx *sqlx.Tx, userID int, sum float32) error {
+func (s *storage) WithdrawBalance(ctx context.Context, tx Tx, userID int, sum float32) error {
 	query, args, err := s.psql.
 		Update("balance").
 		Set("current", sq.Expr("current - ?", sum)).
@@ -104,7 +103,7 @@ func (s *Storage) WithdrawBalance(ctx context.Context, tx *sqlx.Tx, userID int, 
 }
 
 // CreateWithdrawal создаёт запись о списании баллов
-func (s *Storage) CreateWithdrawal(ctx context.Context, tx *sqlx.Tx, userID int, orderNumber string, sum float32) error {
+func (s *storage) CreateWithdrawal(ctx context.Context, tx Tx, userID int, orderNumber string, sum float32) error {
 	query, args, err := s.psql.
 		Insert("withdrawals").
 		Columns("user_id", "order_number", "sum").
@@ -124,7 +123,7 @@ func (s *Storage) CreateWithdrawal(ctx context.Context, tx *sqlx.Tx, userID int,
 }
 
 // GetWithdrawals возвращает историю списаний пользователя, отсортированную от новых к старым
-func (s *Storage) GetWithdrawals(ctx context.Context, userID int) ([]model.Withdrawal, error) {
+func (s *storage) GetWithdrawals(ctx context.Context, userID int) ([]model.Withdrawal, error) {
 	query, args, err := s.psql.
 		Select("id", "user_id", "order_number", "sum", "processed_at").
 		From("withdrawals").

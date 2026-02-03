@@ -77,7 +77,7 @@ func mustInitLogger() *zap.Logger {
 	return logger
 }
 
-func mustInitStorage(logger *zap.Logger, databaseURI string) *storage.Storage {
+func mustInitStorage(logger *zap.Logger, databaseURI string) storage.Storage {
 	store, err := storage.New(databaseURI)
 	if err != nil {
 		logger.Fatal("Не удалось подключиться к БД", zap.Error(err))
@@ -100,7 +100,7 @@ func mustInitAccrualClient(logger *zap.Logger, baseURL string) *accrual.Client {
 	return client
 }
 
-func startAccrualWorker(logger *zap.Logger, store *storage.Storage, accrualSystemAddress string) *worker.AccrualWorker {
+func startAccrualWorker(logger *zap.Logger, store storage.Storage, accrualSystemAddress string) *worker.AccrualWorker {
 	accrualClient := mustInitAccrualClient(logger, accrualSystemAddress)
 	accrualService := service.NewAccrualService(accrualClient, store, logger)
 	w := worker.NewAccrualWorker(accrualService, logger, time.Second*2, 10)
@@ -108,7 +108,7 @@ func startAccrualWorker(logger *zap.Logger, store *storage.Storage, accrualSyste
 	return w
 }
 
-func startServer(store *storage.Storage, logger *zap.Logger, addr, JWTSecret string) *http.Server {
+func startServer(store storage.Storage, logger *zap.Logger, addr, JWTSecret string) *http.Server {
 	authService := service.NewAuthService(JWTSecret, store)
 	orderService := service.NewOrderService(store)
 	balanceService := service.NewBalanceService(store)

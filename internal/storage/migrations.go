@@ -11,7 +11,7 @@ import (
 )
 
 // RunMigrations применяет все ожидающие миграции
-func (s *Storage) RunMigrations(migrationsPath string) error {
+func (s *storage) RunMigrations(migrationsPath string) error {
 	log.Println("Применение миграций...")
 
 	// Создаём драйвер для БД

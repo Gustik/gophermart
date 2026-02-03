@@ -28,11 +28,11 @@ type BalanceService interface {
 
 // balanceService предоставляет бизнес-логику для работы с балансом
 type balanceService struct {
-	storage *storage.Storage
+	storage storage.Storage
 }
 
 // NewBalanceService создаёт новый BalanceService
-func NewBalanceService(storage *storage.Storage) BalanceService {
+func NewBalanceService(storage storage.Storage) BalanceService {
 	return &balanceService{
 		storage: storage,
 	}
