@@ -89,7 +89,7 @@ func mustInitStorage(logger *zap.Logger, databaseURI string) storage.Storage {
 	return store
 }
 
-func mustInitAccrualClient(logger *zap.Logger, baseURL string) *accrual.Client {
+func mustInitAccrualClient(logger *zap.Logger, baseURL string) accrual.Client {
 	client, err := accrual.NewClient(accrual.Config{
 		BaseURL: baseURL,
 		Logger:  logger,

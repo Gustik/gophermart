@@ -1,6 +1,7 @@
 package accrual
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -41,8 +42,13 @@ type OrderAccrual struct {
 	Accrual *float32      `json:"accrual,omitempty"`
 }
 
-// Client представляет HTTP-клиент для взаимодействия с системой начисления
-type Client struct {
+// Client определяет интерфейс клиента для системы начисления
+type Client interface {
+	GetOrderAccrual(ctx context.Context, orderNumber string) (*OrderAccrual, error)
+}
+
+// client представляет HTTP-клиент для взаимодействия с системой начисления
+type client struct {
 	client         *resty.Client
 	logger         *zap.Logger
 	initialBackoff time.Duration
@@ -61,7 +67,7 @@ type Config struct {
 }
 
 // NewClient создаёт новый клиент для системы начисления
-func NewClient(cfg Config) (*Client, error) {
+func NewClient(cfg Config) (Client, error) {
 	// Значения по умолчанию
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 10 * time.Second
@@ -83,7 +89,7 @@ func NewClient(cfg Config) (*Client, error) {
 	}
 
 	// Создаём клиент (понадобится для замыкания в хуках)
-	accrualClient := &Client{
+	accrualClient := &client{
 		logger:         cfg.Logger,
 		initialBackoff: cfg.InitialBackoff,
 	}
@@ -143,7 +149,7 @@ func NewClient(cfg Config) (*Client, error) {
 }
 
 // parseRetryAfter парсит заголовок Retry-After
-func (c *Client) parseRetryAfter(header string) time.Duration {
+func (c *client) parseRetryAfter(header string) time.Duration {
 	if header == "" {
 		return c.initialBackoff
 	}

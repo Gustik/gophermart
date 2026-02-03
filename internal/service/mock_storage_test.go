@@ -32,11 +32,14 @@ func (m *mockTx) Commit() error {
 
 // mockStorage - мок для storage
 type mockStorage struct {
-	getBalanceFunc       func(ctx context.Context, tx storage.Tx, userID int) (*model.Balance, error)
-	beginTxFunc          func(ctx context.Context) (storage.Tx, error)
-	withdrawBalanceFunc  func(ctx context.Context, tx storage.Tx, userID int, sum float32) error
-	createWithdrawalFunc func(ctx context.Context, tx storage.Tx, userID int, orderNumber string, sum float32) error
-	getWithdrawalsFunc   func(ctx context.Context, userID int) ([]model.Withdrawal, error)
+	getBalanceFunc        func(ctx context.Context, tx storage.Tx, userID int) (*model.Balance, error)
+	beginTxFunc           func(ctx context.Context) (storage.Tx, error)
+	withdrawBalanceFunc   func(ctx context.Context, tx storage.Tx, userID int, sum float32) error
+	createWithdrawalFunc  func(ctx context.Context, tx storage.Tx, userID int, orderNumber string, sum float32) error
+	getWithdrawalsFunc    func(ctx context.Context, userID int) ([]model.Withdrawal, error)
+	getPendingOrdersFunc  func(ctx context.Context) ([]model.Order, error)
+	updateOrderStatusFunc func(ctx context.Context, tx storage.Tx, orderNumber string, status model.OrderStatus, accrual *float32) error
+	addBalanceFunc        func(ctx context.Context, tx storage.Tx, userID int, amount *float32) error
 }
 
 func (m *mockStorage) GetBalance(ctx context.Context, tx storage.Tx, userID int) (*model.Balance, error) {
@@ -94,14 +97,23 @@ func (m *mockStorage) GetOrdersByUser(ctx context.Context, userID int) ([]model.
 	return nil, errors.New("not implemented")
 }
 func (m *mockStorage) GetPendingOrders(ctx context.Context) ([]model.Order, error) {
+	if m.getPendingOrdersFunc != nil {
+		return m.getPendingOrdersFunc(ctx)
+	}
 	return nil, errors.New("not implemented")
 }
 func (m *mockStorage) UpdateOrderStatus(ctx context.Context, tx storage.Tx, orderNumber string, status model.OrderStatus, accrual *float32) error {
+	if m.updateOrderStatusFunc != nil {
+		return m.updateOrderStatusFunc(ctx, tx, orderNumber, status, accrual)
+	}
 	return errors.New("not implemented")
 }
 func (m *mockStorage) InitBalance(ctx context.Context, userID int) error {
 	return errors.New("not implemented")
 }
 func (m *mockStorage) AddBalance(ctx context.Context, tx storage.Tx, userID int, amount *float32) error {
+	if m.addBalanceFunc != nil {
+		return m.addBalanceFunc(ctx, tx, userID, amount)
+	}
 	return errors.New("not implemented")
 }

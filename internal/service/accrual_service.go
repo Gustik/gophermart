@@ -13,12 +13,12 @@ import (
 )
 
 type AccrualService struct {
-	client  *accrual.Client
+	client  accrual.Client
 	storage storage.Storage
 	logger  *zap.Logger
 }
 
-func NewAccrualService(client *accrual.Client, storage storage.Storage, logger *zap.Logger) *AccrualService {
+func NewAccrualService(client accrual.Client, storage storage.Storage, logger *zap.Logger) *AccrualService {
 	return &AccrualService{
 		client:  client,
 		storage: storage,

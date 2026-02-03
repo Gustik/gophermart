@@ -9,7 +9,7 @@ import (
 )
 
 // GetOrderAccrual получает информацию о начислении баллов за заказ
-func (c *Client) GetOrderAccrual(ctx context.Context, orderNumber string) (*OrderAccrual, error) {
+func (c *client) GetOrderAccrual(ctx context.Context, orderNumber string) (*OrderAccrual, error) {
 	var result OrderAccrual
 
 	resp, err := c.client.R().
